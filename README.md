@@ -5,3 +5,6 @@ Este repositorio es para la continuación de la práctica 7 de Diseño de Sistem
 ### Versión 0.5
  - Esqueleto del código generado con STM32CUBEMX.
  - main copiado de la práctica anterior.
+
+### Versión 0.8
+ - Esqueleto del código completo.
