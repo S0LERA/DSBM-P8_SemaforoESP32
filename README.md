@@ -8,3 +8,8 @@ Este repositorio es para la continuación de la práctica 7 de Diseño de Sistem
 
 ### Versión 0.8
  - Esqueleto del código completo.
+
+### Versión 1.0
+ - Primera parte completa.
+ - La placa STM recibe bien.
+ - Falta gestionar el funcionamiento del semáforo con las ordenes del esp32.

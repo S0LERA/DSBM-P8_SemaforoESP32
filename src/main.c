@@ -48,9 +48,14 @@ int pulsado = 0;
 int volatile times = 0;
 int cercanos = 0;
 uint8_t data[16];
+uint8_t data_esp32[2];
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_tx;
+int modo = 0;
+int control = 0;
+int counter_parpadeo = 0;
+int esp32_int = 0;
 
 /* USER CODE BEGIN PV */
 
@@ -80,9 +85,6 @@ static void MX_USART1_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  int modo = 0;
-  int control = 0;
-  int counter_parpadeo = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -120,77 +122,104 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-        /* USER CODE END WHILE */
-    htim2.Instance->CCR1 = 75;
-    HAL_Delay(1000);
-    GPIOB->ODR |= GPIO_ODR_OD6_Msk; //Encender Verde Coches
-    GPIOA->ODR |= GPIO_ODR_OD7_Msk; //Encender Rojo Peatones
-    HAL_UART_Transmit(&huart1, "Rojo\n", 5, 1000); //Mandar Pulsar Botón
+    /* USER CODE END WHILE */
+    HAL_UART_Receive_IT(&huart1, data_esp32, sizeof(data_esp32));
+    //printf("Recibido: %s\n", data_esp32);
 
-    if (pulsado == 1)
+    if (esp32_int == 1)
     {
-      modo = 1;
-      control = 1;
-      counter_parpadeo = 0;
-      ultrasonidos();
-      while (control == 1)
+      if (data_esp32 == '80')
       {
-        switch (modo)
-        {
-        case 1:
-          counter_parpadeo = 0;
-          if (cercanos == 1)
-          {
-            HAL_Delay(3000);
-          }
-          GPIOB->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde coches
-          GPIOC->ODR |= GPIO_ODR_OD7_Msk;  //Encender amarillo coches
-          HAL_UART_Transmit(&huart1, "Amarillo\n", 9, 1000); //Mandar Espere Verde
-          HAL_UART_Transmit(&huart1, 1, 1, 1000);
-          HAL_Delay(3000);
-          modo = 2;
-          break;
-        case 2:
-          GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
-          GPIOA->ODR |= GPIO_ODR_OD9_Msk;  //Encender rojo coches
-          htim2.Instance->CCR1 = 25;
-          GPIOA->ODR &= ~GPIO_ODR_OD7_Msk; //Apagamos rojo peatones
-          GPIOA->ODR |= GPIO_ODR_OD6_Msk;  //Encender verde peatones
-          HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
-          HAL_UART_Transmit(&huart1, 2, 1, 1000);
-          HAL_Delay(15000);
-          modo = 3;
-          break;
-        case 3:
-          while (counter_parpadeo < 15)
-          {
-            GPIOA->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde peatones
-            HAL_Delay(100);
-            GPIOA->ODR |= GPIO_ODR_OD6_Msk; //Encender verde peatones
-            HAL_Delay(100);
-            counter_parpadeo++;
-          }
-          modo = 4;
-          break;
-        case 4:
-          GPIOA->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde peatones
-          GPIOA->ODR &= ~GPIO_ODR_OD9_Msk; //Apagar rojo coches
-          GPIOB->ODR |= GPIO_ODR_OD6_Msk;  //Encendemos verde coches
-          GPIOA->ODR |= GPIO_ODR_OD7_Msk;  //Encendemos rojo peatones
-          modo = 1;
-          control = 0;
-          pulsado = 0;
-          cercanos = 0;
-          times = 0;
-          break;
-        }
+        modo = 2;
       }
-      /* USER CODE BEGIN 3 */
+      else if (data_esp32 == '81')
+      {
+        modo = 1;
+      }
+      else if (data_esp32 == '82')
+      {
+        modo = 0;
+      }
+      esp32_int = 0;
+    }
+    else
+    {
+      htim2.Instance->CCR1 = 75;
+      HAL_Delay(1000);
+      GPIOB->ODR |= GPIO_ODR_OD6_Msk;                //Encender Verde Coches
+      GPIOA->ODR |= GPIO_ODR_OD7_Msk;                //Encender Rojo Peatones
+      HAL_UART_Transmit(&huart1, "Rojo\n", 5, 1000); //Mandar Pulsar Botón
     }
   }
-  /* USER CODE END 3 */
-}
 
+  if (pulsado == 1)
+  {
+    modo = 1;
+    control = 1;
+    counter_parpadeo = 0;
+    ultrasonidos();
+    while (control == 1)
+    {
+      stateMachine();
+    }
+    /* USER CODE BEGIN 3 */
+  }
+}
+/* USER CODE END 3 */
+
+
+void stateMachine()
+{
+  switch (modo)
+  {
+  case 1:
+    counter_parpadeo = 0;
+    if (cercanos == 1)
+    {
+      HAL_Delay(3000);
+    }
+    GPIOB->ODR &= ~GPIO_ODR_OD6_Msk;                   //Apagar verde coches
+    GPIOC->ODR |= GPIO_ODR_OD7_Msk;                    //Encender amarillo coches
+    HAL_UART_Transmit(&huart1, "Amarillo\n", 9, 1000); //Mandar Espere Verde
+    HAL_UART_Transmit(&huart1, 1, 1, 1000);
+    HAL_Delay(3000);
+    modo = 2;
+    break;
+  case 2:
+    GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
+    GPIOA->ODR |= GPIO_ODR_OD9_Msk;  //Encender rojo coches
+    htim2.Instance->CCR1 = 25;
+    GPIOA->ODR &= ~GPIO_ODR_OD7_Msk;                //Apagamos rojo peatones
+    GPIOA->ODR |= GPIO_ODR_OD6_Msk;                 //Encender verde peatones
+    HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
+    HAL_UART_Transmit(&huart1, 2, 1, 1000);
+    HAL_Delay(15000);
+    modo = 3;
+    break;
+  case 3:
+    while (counter_parpadeo < 15)
+    {
+      GPIOA->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde peatones
+      HAL_Delay(100);
+      GPIOA->ODR |= GPIO_ODR_OD6_Msk; //Encender verde peatones
+      HAL_Delay(100);
+      counter_parpadeo++;
+    }
+    modo = 4;
+    break;
+  case 4:
+    GPIOA->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde peatones
+    GPIOA->ODR &= ~GPIO_ODR_OD9_Msk; //Apagar rojo coches
+    GPIOB->ODR |= GPIO_ODR_OD6_Msk;  //Encendemos verde coches
+    GPIOA->ODR |= GPIO_ODR_OD7_Msk;  //Encendemos rojo peatones
+    modo = 1;
+    control = 0;
+    pulsado = 0;
+    cercanos = 0;
+    times = 0;
+    break;
+  }
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -221,8 +250,7 @@ void SystemClock_Config(void)
   }
   /** Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -257,7 +285,6 @@ static void MX_TIM2_Init(void)
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
@@ -280,7 +307,6 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 2 */
   HAL_TIM_MspPostInit(&htim2);
-
 }
 
 /**
@@ -303,7 +329,6 @@ static void MX_TIM11_Init(void)
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim11.Init.Period = 9;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
     Error_Handler();
@@ -311,7 +336,6 @@ static void MX_TIM11_Init(void)
   /* USER CODE BEGIN TIM11_Init 2 */
 
   /* USER CODE END TIM11_Init 2 */
-
 }
 
 /**
@@ -344,7 +368,6 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
-
 }
 
 /**
@@ -377,13 +400,12 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
-
 }
 
 /** 
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
@@ -392,7 +414,6 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-
 }
 
 /**
@@ -411,7 +432,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|VerdeP_Pin|RojoP_Pin|RojoC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin | VerdeP_Pin | RojoP_Pin | RojoC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(AmarilloC_GPIO_Port, AmarilloC_Pin, GPIO_PIN_RESET);
@@ -426,7 +447,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD2_Pin VerdeP_Pin RojoP_Pin RojoC_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|VerdeP_Pin|RojoP_Pin|RojoC_Pin;
+  GPIO_InitStruct.Pin = LD2_Pin | VerdeP_Pin | RojoP_Pin | RojoC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -461,7 +482,6 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 7, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -476,6 +496,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   HAL_UART_Transmit_IT(&huart1, data, sizeof(data));
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  esp32_int = 1;
+  HAL_UART_Receive_IT(&huart1, data_esp32, sizeof(data_esp32));
 }
 
 void cambiarModoPin(int modo)
@@ -573,7 +599,7 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
@@ -582,7 +608,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
