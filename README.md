@@ -13,3 +13,7 @@ Este repositorio es para la continuación de la práctica 7 de Diseño de Sistem
  - Primera parte completa.
  - La placa STM recibe bien.
  - Falta gestionar el funcionamiento del semáforo con las ordenes del esp32.
+
+### Versión 2.0
+ - El programa funciona con botón y con ordenes por separado.
+ - Falta integrar ambas funcionalidades en una sola.

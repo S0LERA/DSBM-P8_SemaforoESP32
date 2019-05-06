@@ -48,7 +48,7 @@ int pulsado = 0;
 int volatile times = 0;
 int cercanos = 0;
 uint8_t data[16];
-uint8_t data_esp32[2];
+unsigned char data_esp32[2];
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_tx;
@@ -56,6 +56,7 @@ int modo = 0;
 int control = 0;
 int counter_parpadeo = 0;
 int esp32_int = 0;
+int esp32_modo = 0;
 
 /* USER CODE BEGIN PV */
 
@@ -122,52 +123,102 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
     /* USER CODE END WHILE */
+
     HAL_UART_Receive_IT(&huart1, data_esp32, sizeof(data_esp32));
-    //printf("Recibido: %s\n", data_esp32);
+    printf("Recibido: %c\r\n", data_esp32[1]);
 
     if (esp32_int == 1)
     {
-      if (data_esp32 == '80')
+      if (data_esp32[0] == '8')
       {
-        modo = 2;
+        if (data_esp32[1] == '0')
+        {
+          if (esp32_modo == 0)
+          {
+            while (data_esp32[1] != '2')
+            {
+              printf(" \r\n");
+            }
+          }
+          else if (esp32_modo == 1)
+          {
+            ultrasonidos();
+            modo = 1;
+            for (int i = 0; i < 4; i++)
+            {
+              stateMachine();
+            }
+          }
+          else if (esp32_modo == 2)
+          {
+            modo = 2;
+            stateMachine();
+          }
+        }
+
+        else if (data_esp32[1] == '1')
+        {
+          if (esp32_modo == 1)
+          {
+            while (data_esp32[1] == '1')
+            {
+              printf(" \r\n");
+            }
+
+          }
+          else if (esp32_modo == 0)
+          {
+            modo = 3;
+            stateMachine();
+          }
+          else if (esp32_modo == 2)
+          {
+            modo = 4;
+            stateMachine();
+          }
+        }
+        else if (data_esp32[1] == '2')
+        {
+          modo = 0;
+          stateMachine();
+        }
+        esp32_int = 0;
       }
-      else if (data_esp32 == '81')
-      {
-        modo = 1;
-      }
-      else if (data_esp32 == '82')
-      {
-        modo = 0;
-      }
-      esp32_int = 0;
     }
     else
     {
-      htim2.Instance->CCR1 = 75;
-      HAL_Delay(1000);
-      GPIOB->ODR |= GPIO_ODR_OD6_Msk;                //Encender Verde Coches
-      GPIOA->ODR |= GPIO_ODR_OD7_Msk;                //Encender Rojo Peatones
-      HAL_UART_Transmit(&huart1, "Rojo\n", 5, 1000); //Mandar Pulsar Botón
-    }
-  }
-
-  if (pulsado == 1)
-  {
-    modo = 1;
-    control = 1;
-    counter_parpadeo = 0;
-    ultrasonidos();
-    while (control == 1)
-    {
+      modo = 0;
       stateMachine();
     }
-    /* USER CODE BEGIN 3 */
+
+    if (pulsado == 1)
+    {
+      modo = 1;
+      control = 1;
+      counter_parpadeo = 0;
+      ultrasonidos();
+      while (control == 1)
+      {
+        stateMachine();
+      }
+      /* USER CODE BEGIN 3 */
+    }
   }
 }
 /* USER CODE END 3 */
-
-
+void rojoCoches()
+{
+  GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
+  GPIOA->ODR |= GPIO_ODR_OD9_Msk;  //Encender rojo coches
+  htim2.Instance->CCR1 = 25;
+  GPIOA->ODR &= ~GPIO_ODR_OD7_Msk;                //Apagamos rojo peatones
+  GPIOA->ODR |= GPIO_ODR_OD6_Msk;                 //Encender verde peatones
+  HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
+  HAL_UART_Transmit(&huart1, 2, 1, 1000);
+  HAL_Delay(15000);
+}
 void stateMachine()
 {
   switch (modo)
@@ -184,6 +235,7 @@ void stateMachine()
     HAL_UART_Transmit(&huart1, 1, 1, 1000);
     HAL_Delay(3000);
     modo = 2;
+    esp32_modo = 2;
     break;
   case 2:
     GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
@@ -193,8 +245,16 @@ void stateMachine()
     GPIOA->ODR |= GPIO_ODR_OD6_Msk;                 //Encender verde peatones
     HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
     HAL_UART_Transmit(&huart1, 2, 1, 1000);
-    HAL_Delay(15000);
+    HAL_Delay(3000);
+    if (esp32_int == 1)
+    {
+      while (data_esp32[1] == '0')
+      {
+        printf(" \r\n");
+      }
+    }
     modo = 3;
+    esp32_modo = 0;
     break;
   case 3:
     while (counter_parpadeo < 15)
@@ -206,6 +266,7 @@ void stateMachine()
       counter_parpadeo++;
     }
     modo = 4;
+    esp32_modo = 0;
     break;
   case 4:
     GPIOA->ODR &= ~GPIO_ODR_OD6_Msk; //Apagar verde peatones
@@ -217,6 +278,15 @@ void stateMachine()
     pulsado = 0;
     cercanos = 0;
     times = 0;
+    esp32_modo = 1;
+    break;
+  default:
+    htim2.Instance->CCR1 = 75;
+    HAL_Delay(1000);
+    GPIOB->ODR |= GPIO_ODR_OD6_Msk;                //Encender Verde Coches
+    GPIOA->ODR |= GPIO_ODR_OD7_Msk;                //Encender Rojo Peatones
+    HAL_UART_Transmit(&huart1, "Rojo\n", 5, 1000); //Mandar Pulsar Botón
+    esp32_modo = 1;
     break;
   }
 }
