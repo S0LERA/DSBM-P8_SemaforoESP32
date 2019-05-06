@@ -22,3 +22,6 @@ Este repositorio es para la continuación de la práctica 7 de Diseño de Sistem
  - Funcionalidad del ESP32 completada.
    - Si el programa está realizando la secuencia del botón no atenderá las ordenes del ESP32.
    - Si el programa está atendiendo ordenes del ESP32, no aceptará la interrupción del botón.
+
+### Versión 3.0
+ - Documentación añadida.
