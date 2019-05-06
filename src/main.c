@@ -133,6 +133,7 @@ int main(void)
     {
       if (data_esp32[0] == '8')
       {
+        __set_BASEPRI(1);
         if (data_esp32[1] == '0')
         {
           if (esp32_modo == 0)
@@ -146,7 +147,7 @@ int main(void)
           {
             ultrasonidos();
             modo = 1;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4 && data_esp32[1] != '1'; i++)
             {
               stateMachine();
             }
@@ -189,6 +190,7 @@ int main(void)
     }
     else
     {
+      __set_BASEPRI(8);
       modo = 0;
       stateMachine();
     }
@@ -208,17 +210,6 @@ int main(void)
   }
 }
 /* USER CODE END 3 */
-void rojoCoches()
-{
-  GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
-  GPIOA->ODR |= GPIO_ODR_OD9_Msk;  //Encender rojo coches
-  htim2.Instance->CCR1 = 25;
-  GPIOA->ODR &= ~GPIO_ODR_OD7_Msk;                //Apagamos rojo peatones
-  GPIOA->ODR |= GPIO_ODR_OD6_Msk;                 //Encender verde peatones
-  HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
-  HAL_UART_Transmit(&huart1, 2, 1, 1000);
-  HAL_Delay(15000);
-}
 void stateMachine()
 {
   switch (modo)
@@ -229,13 +220,13 @@ void stateMachine()
     {
       HAL_Delay(3000);
     }
+    esp32_modo = 2;
     GPIOB->ODR &= ~GPIO_ODR_OD6_Msk;                   //Apagar verde coches
     GPIOC->ODR |= GPIO_ODR_OD7_Msk;                    //Encender amarillo coches
     HAL_UART_Transmit(&huart1, "Amarillo\n", 9, 1000); //Mandar Espere Verde
     HAL_UART_Transmit(&huart1, 1, 1, 1000);
     HAL_Delay(3000);
     modo = 2;
-    esp32_modo = 2;
     break;
   case 2:
     GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar amarillo coches
@@ -273,6 +264,7 @@ void stateMachine()
     GPIOA->ODR &= ~GPIO_ODR_OD9_Msk; //Apagar rojo coches
     GPIOB->ODR |= GPIO_ODR_OD6_Msk;  //Encendemos verde coches
     GPIOA->ODR |= GPIO_ODR_OD7_Msk;  //Encendemos rojo peatones
+    htim2.Instance->CCR1 = 75;
     modo = 1;
     control = 0;
     pulsado = 0;
@@ -283,6 +275,7 @@ void stateMachine()
   default:
     htim2.Instance->CCR1 = 75;
     HAL_Delay(1000);
+    GPIOC->ODR &= ~GPIO_ODR_OD7_Msk; //Apagar Amarillo coches (Para ESP32)
     GPIOB->ODR |= GPIO_ODR_OD6_Msk;                //Encender Verde Coches
     GPIOA->ODR |= GPIO_ODR_OD7_Msk;                //Encender Rojo Peatones
     HAL_UART_Transmit(&huart1, "Rojo\n", 5, 1000); //Mandar Pulsar Botón
