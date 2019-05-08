@@ -236,7 +236,7 @@ void stateMachine()
     GPIOA->ODR |= GPIO_ODR_OD6_Msk;                 //Encender verde peatones
     HAL_UART_Transmit(&huart1, "Verde\n", 6, 1000); //Mandar Pase
     HAL_UART_Transmit(&huart1, 2, 1, 1000);
-    HAL_Delay(3000);
+    HAL_Delay(15000);
     if (esp32_int == 1)
     {
       while (data_esp32[1] == '0')
